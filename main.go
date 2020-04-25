@@ -8,7 +8,108 @@ import (
 	"strconv"
 )
 
-type TokenKind int
+type NodeKind int
+
+const (
+	ND_ADD NodeKind = iota + 1
+	ND_SUB
+	ND_MUL
+	ND_DIV
+	ND_NUM
+)
+
+type Node struct {
+	kind NodeKind
+	lhs *Node
+	rhs *Node
+	val int
+}
+
+func NewNode(kind NodeKind, lhs *Node, rhs *Node) *Node {
+	return &Node{
+		kind: kind,
+		lhs:  lhs,
+		rhs:  rhs,
+	}
+}
+
+func NewNumNode(val int) *Node{
+	return &Node{
+		kind: ND_NUM,
+		val:  val,
+	}
+}
+
+func (t *Token) expr() *Node {
+	node := t.mul()
+	for {
+		if t.consume('+') {
+			node = NewNode(ND_ADD, node, t.mul())
+		} else if t.consume('-') {
+			node = NewNode(ND_SUB, node, t.mul())
+		} else {
+			return node
+		}
+	}
+}
+
+func (t *Token) mul() *Node {
+	node := t.primary()
+	for {
+		if t.consume('*') {
+			node = NewNode(ND_MUL, node, t.primary())
+		} else if t.consume('/') {
+			node = NewNode(ND_DIV, node, t.primary())
+		} else {
+			return node
+		}
+	}
+}
+
+func (t *Token) primary() *Node {
+	if t.consume('(') {
+		node := t.expr()
+		t.expect(')')
+		return node
+	}
+	i, _ := t.expectNumber()
+	return NewNumNode(i)
+}
+
+func (node *Node) debug() {
+	log.Println(node)
+	if node.lhs != nil {
+		node.lhs.debug()
+	}
+	if node.rhs != nil {
+		node.rhs.debug()
+	}
+}
+
+func (node *Node) gen() {
+	if node.kind == ND_NUM  {
+		fmt.Printf("  push %d\n", node.val)
+		return
+	}
+
+	node.lhs.gen()
+	node.rhs.gen()
+	fmt.Println("  pop rdi")
+	fmt.Println("  pop rax")
+
+	switch node.kind {
+	case ND_ADD:
+		fmt.Println("  add rax, rdi")
+	case ND_SUB:
+		fmt.Println("  sub rax, rdi")
+	case ND_MUL:
+		fmt.Println("  imul rax, rdi")
+	case ND_DIV:
+		fmt.Println("  cqo")
+		fmt.Println("  idiv rdi")
+	}
+	fmt.Println("  push rax")
+}
 
 type CompileError struct {
 	message string
@@ -30,8 +131,9 @@ func (c CompileError) Error() string {
 	return err
 }
 
+type TokenKind int
 const (
-	TK_RESERVED TokenKind = iota
+	TK_RESERVED TokenKind = iota + 1
 	TK_NUM
 	TK_EOF
 )
@@ -83,6 +185,7 @@ func newNextToken(kind TokenKind, cur *Token, str string, meta Meta) *Token {
 }
 
 var regexNumber = regexp.MustCompile(`^[0-9]+`)
+var tokenRegexp = regexp.MustCompile(`([+\-*/()])`)
 
 func tokenize(s string) (*Token, error) {
 	head := Token{}
@@ -93,7 +196,7 @@ func tokenize(s string) (*Token, error) {
 			i++
 			continue
 		}
-		if s[i] == '+' || s[i] == '-' {
+		if tokenRegexp.Match([]byte{s[i]}) {
 			cur = newNextToken(TK_RESERVED, cur, string(s[i]), Meta{s, i})
 			i++
 			continue
@@ -130,33 +233,10 @@ func main() {
 		log.Fatal(err.Error())
 		return
 	}
+	node := token.expr()
 	printHeader()
 	fmt.Println("_main:")
-	n, err := token.expectNumber()
-	if err != nil {
-		log.Fatal(err.Error())
-		return
-	}
-	fmt.Printf("  mov rax, %d\n", n)
-	for !token.atEof() {
-		if token.consume('+') {
-			n, err := token.expectNumber()
-			if err != nil {
-				log.Fatal(err.Error())
-				return
-			}
-			fmt.Printf("  add rax, %d\n", n)
-			continue
-		}
-		if token.consume('-') {
-			n, err := token.expectNumber()
-			if err != nil {
-				log.Fatal(err.Error())
-				return
-			}
-			fmt.Printf("  sub rax, %d\n", n)
-			continue
-		}
-	}
+	node.gen()
+	fmt.Println("  pop rax")
 	fmt.Println("  ret")
 }
