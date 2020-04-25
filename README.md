@@ -15,7 +15,8 @@ make test
 ## Syntax
 ```ABNF
 expr    = mul ("+" mul | "-" mul)*
-mul     = primary ("*" primary | "/" primary)*
+mul     = unary ("*" unary | "/" unary)*
+unary   = ("+" | "-")? primary
 primary = num | "(" expr ")"
 num     = ("0"|...|"9")+
 ```

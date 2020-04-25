@@ -25,16 +25,25 @@ func (t *token) Expr() node.Node {
 }
 
 func (t *token) mul() node.Node {
-	n := t.primary()
+	n := t.unary()
 	for {
 		if t.consume('*') {
-			n = node.NewNode(node.Mul, n, t.primary())
+			n = node.NewNode(node.Mul, n, t.unary())
 		} else if t.consume('/') {
-			n = node.NewNode(node.Div, n, t.primary())
+			n = node.NewNode(node.Div, n, t.unary())
 		} else {
 			return n
 		}
 	}
+}
+
+func (t *token) unary() node.Node {
+	if t.consume('+') {
+		return t.primary()
+	} else if t.consume('-') {
+		return node.NewNode(node.Sub, node.NewNumNode(0), t.primary())
+	}
+	return t.primary()
 }
 
 func (t *token) primary() node.Node {
