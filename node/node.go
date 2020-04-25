@@ -8,11 +8,11 @@ import (
 type kind int
 
 const (
-	ND_ADD kind = iota + 1
-	ND_SUB
-	ND_MUL
-	ND_DIV
-	ND_NUM
+	Add kind = iota + 1
+	Sub
+	Mul
+	Div
+	Num
 )
 
 type Node interface {
@@ -37,14 +37,14 @@ func NewNode(kind kind, lhs Node, rhs Node) Node {
 
 func NewNumNode(val int) Node{
 	return &node{
-		kind: ND_NUM,
+		kind: Num,
 		val:  val,
 	}
 }
 
 
 func (node *node) Gen() string {
-	if node.kind == ND_NUM  {
+	if node.kind == Num {
 		return fmt.Sprintf("  push %d\n", node.val)
 	}
 	var result string
@@ -55,13 +55,13 @@ func (node *node) Gen() string {
 	result += fmt.Sprintln("  pop rax")
 
 	switch node.kind {
-	case ND_ADD:
+	case Add:
 		result +=fmt.Sprintln("  add rax, rdi")
-	case ND_SUB:
+	case Sub:
 		result +=fmt.Sprintln("  sub rax, rdi")
-	case ND_MUL:
+	case Mul:
 		result +=fmt.Sprintln("  imul rax, rdi")
-	case ND_DIV:
+	case Div:
 		result +=fmt.Sprintln("  cqo")
 		result +=fmt.Sprintln("  idiv rdi")
 	}

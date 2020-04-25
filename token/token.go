@@ -15,9 +15,9 @@ func (t *token) Expr() node.Node {
 	n := t.mul()
 	for {
 		if t.consume('+') {
-			n = node.NewNode(node.ND_ADD, n, t.mul())
+			n = node.NewNode(node.Add, n, t.mul())
 		} else if t.consume('-') {
-			n = node.NewNode(node.ND_SUB, n, t.mul())
+			n = node.NewNode(node.Sub, n, t.mul())
 		} else {
 			return n
 		}
@@ -28,9 +28,9 @@ func (t *token) mul() node.Node {
 	n := t.primary()
 	for {
 		if t.consume('*') {
-			n = node.NewNode(node.ND_MUL, n, t.primary())
+			n = node.NewNode(node.Mul, n, t.primary())
 		} else if t.consume('/') {
-			n = node.NewNode(node.ND_DIV, n, t.primary())
+			n = node.NewNode(node.Div, n, t.primary())
 		} else {
 			return n
 		}
@@ -70,9 +70,9 @@ func (c compileError) Error() string {
 
 type kind int
 const (
-	TK_RESERVED kind = iota + 1
-	TK_NUM
-	TK_EOF
+	reserved kind = iota + 1
+	num
+	eof
 )
 
 type token struct {
@@ -84,14 +84,14 @@ type token struct {
 }
 
 func (t *token) consume(op byte) bool {
-	if t.kind != TK_RESERVED || t.str[0] != op {
+	if t.kind != reserved || t.str[0] != op {
 		return false
 	}
 	*t = *t.next
 	return true
 }
 func (t *token) expect(op byte) error {
-	if t.kind != TK_RESERVED || t.str[0] != op {
+	if t.kind != reserved || t.str[0] != op {
 		return compileError{fmt.Sprintf("%cではありません", op), t.meta.line, t.meta.pos}
 	}
 	*t = *t.next
@@ -99,7 +99,7 @@ func (t *token) expect(op byte) error {
 }
 
 func (t *token) expectNumber() (int, error) {
-	if t.kind != TK_NUM {
+	if t.kind != num {
 		return 0, compileError{"数ではありません", t.meta.line, t.meta.pos}
 	}
 	val := t.value
@@ -108,7 +108,7 @@ func (t *token) expectNumber() (int, error) {
 }
 
 func (t token) atEof() bool {
-	return t.kind == TK_EOF
+	return t.kind == eof
 }
 
 func newNextToken(kind kind, cur *token, str string, meta meta) *token {
@@ -134,13 +134,13 @@ func Tokenize(s string) (Token, error) {
 			continue
 		}
 		if tokenRegexp.Match([]byte{s[i]}) {
-			cur = newNextToken(TK_RESERVED, cur, string(s[i]), meta{s, i})
+			cur = newNextToken(reserved, cur, string(s[i]), meta{s, i})
 			i++
 			continue
 		}
 		if regexNumber.MatchString(s[i:]) {
 			num := regexNumber.FindString(s[i:])
-			cur = newNextToken(TK_NUM, cur, num, meta{s, i})
+			cur = newNextToken(num, cur, num, meta{s, i})
 			n, _ := strconv.Atoi(num)
 			cur.value = n
 			i += len(num)
@@ -149,6 +149,6 @@ func Tokenize(s string) (Token, error) {
 
 		return nil, compileError{"tokenizeできません", s, i}
 	}
-	newNextToken(TK_EOF, cur, "", meta{s, i})
+	newNextToken(eof, cur, "", meta{s, i})
 	return head.next, nil
 }
