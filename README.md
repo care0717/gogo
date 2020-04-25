@@ -17,4 +17,5 @@ make test
 expr    = mul ("+" mul | "-" mul)*
 mul     = primary ("*" primary | "/" primary)*
 primary = num | "(" expr ")"
+num     = ("0"|...|"9")+
 ```
