@@ -71,7 +71,7 @@ func (c compileError) Error() string {
 type kind int
 const (
 	reserved kind = iota + 1
-	num
+	number
 	eof
 )
 
@@ -99,7 +99,7 @@ func (t *token) expect(op byte) error {
 }
 
 func (t *token) expectNumber() (int, error) {
-	if t.kind != num {
+	if t.kind != number {
 		return 0, compileError{"数ではありません", t.meta.line, t.meta.pos}
 	}
 	val := t.value
@@ -140,7 +140,7 @@ func Tokenize(s string) (Token, error) {
 		}
 		if regexNumber.MatchString(s[i:]) {
 			num := regexNumber.FindString(s[i:])
-			cur = newNextToken(num, cur, num, meta{s, i})
+			cur = newNextToken(number, cur, num, meta{s, i})
 			n, _ := strconv.Atoi(num)
 			cur.value = n
 			i += len(num)
