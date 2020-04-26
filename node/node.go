@@ -2,7 +2,6 @@ package node
 
 import (
 	"fmt"
-	"log"
 )
 
 type kind int
@@ -12,12 +11,15 @@ const (
 	Sub
 	Mul
 	Div
+	Eq
+	Ne
+	Lt
+	Le
 	Num
 )
 
 type Node interface {
 	Gen() string
-	debug()
 }
 
 type node struct {
@@ -35,46 +37,52 @@ func NewNode(kind kind, lhs Node, rhs Node) Node {
 	}
 }
 
-func NewNumNode(val int) Node{
+func NewNumNode(val int) Node {
 	return &node{
 		kind: Num,
 		val:  val,
 	}
 }
 
-
 func (node *node) Gen() string {
 	if node.kind == Num {
 		return fmt.Sprintf("  push %d\n", node.val)
 	}
-	var result string
+	var res string
 
-	result += node.lhs.Gen()
-	result += node.rhs.Gen()
-	result += fmt.Sprintln("  pop rdi")
-	result += fmt.Sprintln("  pop rax")
+	res += node.lhs.Gen()
+	res += node.rhs.Gen()
+	res += fmt.Sprintln("  pop rdi")
+	res += fmt.Sprintln("  pop rax")
 
 	switch node.kind {
 	case Add:
-		result +=fmt.Sprintln("  add rax, rdi")
+		res += fmt.Sprintln("  add rax, rdi")
 	case Sub:
-		result +=fmt.Sprintln("  sub rax, rdi")
+		res += fmt.Sprintln("  sub rax, rdi")
 	case Mul:
-		result +=fmt.Sprintln("  imul rax, rdi")
+		res += fmt.Sprintln("  imul rax, rdi")
 	case Div:
-		result +=fmt.Sprintln("  cqo")
-		result +=fmt.Sprintln("  idiv rdi")
+		res += fmt.Sprintln("  cqo")
+		res += fmt.Sprintln("  idiv rdi")
+	case Eq:
+		res += fmt.Sprintln("  cmp rax, rdi")
+		res += fmt.Sprintln("  sete al")
+		res += fmt.Sprintln("  movzx rax, al")
+	case Ne:
+		res += fmt.Sprintln("  cmp rax, rdi")
+		res += fmt.Sprintln("  setne al")
+		res += fmt.Sprintln("  movzx rax, al")
+	case Lt:
+		res += fmt.Sprintln("  cmp rax, rdi")
+		res += fmt.Sprintln("  setl al")
+		res += fmt.Sprintln("  movzx rax, al")
+	case Le:
+		res += fmt.Sprintln("  cmp rax, rdi")
+		res += fmt.Sprintln("  setle al")
+		res += fmt.Sprintln("  movzx rax, al")
 	}
-	result += fmt.Sprintln("  push rax")
-	return result
+	res += fmt.Sprintln("  push rax")
+	return res
 }
 
-func (node *node) debug() {
-	log.Println(node)
-	if node.lhs != nil {
-		node.lhs.debug()
-	}
-	if node.rhs != nil {
-		node.rhs.debug()
-	}
-}

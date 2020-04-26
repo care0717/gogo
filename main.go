@@ -1,11 +1,11 @@
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
 	"github.com/care0717/gogo/token"
 	"log"
-
+	"os"
 )
 
 func printHeader() {
@@ -14,13 +14,10 @@ func printHeader() {
 }
 
 func main() {
-	flag.Parse()
-	args := flag.Args()
-	if len(args) != 1 {
-		log.Fatalln("引数の個数が正しくありません")
-		return
-	}
-	t, err := token.Tokenize(args[0])
+	stdin := bufio.NewScanner(os.Stdin)
+	stdin.Scan()
+	text := stdin.Text()
+	t, err := token.Tokenize(text)
 	if err != nil {
 		log.Fatal(err.Error())
 		return
