@@ -11,6 +11,10 @@ import (
 func printHeader() {
 	fmt.Println(".intel_syntax noprefix")
 	fmt.Println(".global _main")
+	fmt.Println("_main:")
+	fmt.Println("  push rbp")
+	fmt.Println("  mov rbp, rsp")
+	fmt.Println("  sub rsp, 208")
 }
 
 func main() {
@@ -22,10 +26,17 @@ func main() {
 		log.Fatal(err.Error())
 		return
 	}
-	n := t.Expr()
 	printHeader()
-	fmt.Println("_main:")
-	fmt.Println(n.Gen())
-	fmt.Println("  pop rax")
+	ps, err := t.Program()
+	if err != nil {
+		log.Fatal(err.Error())
+		return
+	}
+	for _, p := range ps {
+		fmt.Println(p.Gen())
+		fmt.Println("  pop rax")
+	}
+	fmt.Println("  mov rsp, rbp")
+	fmt.Println("  pop rbp")
 	fmt.Println("  ret")
 }

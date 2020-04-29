@@ -10,7 +10,6 @@ gogo: *.go
 
 test: gogo
 	./test.sh
-	make clean
 
 clean:
 	rm -f gogo *.o *~ tmp*

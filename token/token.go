@@ -8,86 +8,191 @@ import (
 )
 
 type Token interface {
-	Expr() node.Node
+	Program() ([]node.Node, error)
 }
 
-func (t *token) Expr() node.Node {
-	return t.equality()
+func (t *token) Program() ([]node.Node, error) {
+	var code []node.Node
+	for !t.atEof() {
+		c, err := t.stmt()
+		if err != nil {
+			return nil, err
+		}
+		code = append(code, c)
+	}
+	return code, nil
 }
 
-func (t *token) equality() node.Node {
-	n := t.relational()
+func (t *token) stmt() (node.Node, error) {
+	n, err := t.expr()
+	if err != nil {
+		return nil, err
+	}
+	if err := t.expect(";"); err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+func (t *token) expr()  (node.Node, error) {
+	return t.assign()
+}
+
+func (t *token) assign()  (node.Node, error) {
+	n, err := t.equality()
+	if err != nil {
+		return nil, err
+	}
+	if t.consume("=") {
+		tmp, err := t.assign()
+		if err != nil {
+			return nil, err
+		}
+		n = node.NewNode(node.Assign, n, tmp)
+	}
+	return n, nil
+}
+
+func (t *token) equality() (node.Node, error) {
+	n, err:= t.relational()
+	if err != nil {
+		return nil, err
+	}
 	for {
 		if t.consume("==") {
-			n = node.NewNode(node.Eq, n, t.relational())
+			tmp, err:= t.relational()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Eq, n, tmp)
 		} else if t.consume("!=") {
-			n = node.NewNode(node.Ne, n, t.relational())
+			tmp, err:= t.relational()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Ne, n, tmp)
 		} else {
-			return n
+			return n, nil
 		}
 	}
 }
 
-func (t *token) relational() node.Node {
-	n := t.add()
+func (t *token) relational() (node.Node, error) {
+	n, err := t.add()
+	if err != nil {
+		return nil, err
+	}
 	for {
 		if t.consume("<") {
-			n = node.NewNode(node.Lt, n, t.add())
+			tmp, err := t.add()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Lt, n, tmp)
 		} else if t.consume(">") {
-			n = node.NewNode(node.Lt, t.add(), n)
+			tmp, err := t.add()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Lt, tmp, n)
 		} else if t.consume("<=") {
-			n = node.NewNode(node.Le, n, t.add())
+			tmp, err := t.add()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Le, n, tmp)
 		} else if t.consume(">=") {
-			n = node.NewNode(node.Le, t.add(), n)
+			tmp, err := t.add()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Le, tmp, n)
 		} else {
-			return n
+			return n, nil
 		}
 	}
 }
 
-func (t *token) add() node.Node {
-	n := t.mul()
+func (t *token) add() (node.Node, error) {
+	n, err := t.mul()
+	if err != nil {
+		return nil, err
+	}
 	for {
 		if t.consume("+") {
-			n = node.NewNode(node.Add, n, t.mul())
+			tmp, err := t.mul()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Add, n, tmp)
 		} else if t.consume("-") {
-			n = node.NewNode(node.Sub, n, t.mul())
+			tmp, err := t.mul()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Sub, n, tmp)
 		} else {
-			return n
+			return n, nil
 		}
 	}
 }
 
-func (t *token) mul() node.Node {
-	n := t.unary()
+func (t *token) mul() (node.Node, error) {
+	n, err := t.unary()
+	if err != nil {
+		return nil, err
+	}
 	for {
 		if t.consume("*") {
-			n = node.NewNode(node.Mul, n, t.unary())
+			tmp, err := t.unary()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Mul, n, tmp)
 		} else if t.consume("/") {
-			n = node.NewNode(node.Div, n, t.unary())
+			tmp, err := t.unary()
+			if err != nil {
+				return nil, err
+			}
+			n = node.NewNode(node.Div, n, tmp)
 		} else {
-			return n
+			return n, nil
 		}
 	}
 }
 
-func (t *token) unary() node.Node {
+func (t *token) unary() (node.Node, error) {
 	if t.consume("+") {
 		return t.unary()
 	} else if t.consume("-") {
-		return node.NewNode(node.Sub, node.NewNumNode(0), t.unary())
+		n, err := t.unary()
+		if err != nil {
+			return nil, err
+		}
+		return node.NewNode(node.Sub, node.NewNumNode(0), n), nil
 	}
 	return t.primary()
 }
 
-func (t *token) primary() node.Node {
+func (t *token) primary() (node.Node, error) {
 	if t.consume("(") {
-		n := t.Expr()
-		t.expect(")")
-		return n
+		n, err := t.expr()
+		if err != nil {
+			return nil, err
+		}
+		if err := t.expect(")"); err != nil {
+			return nil, err
+		}
+		return n, nil
 	}
-	i, _ := t.expectNumber()
-	return node.NewNumNode(i)
+
+	if i, ok := t.consumeNumber(); ok {
+		return node.NewNumNode(i), nil
+	}
+	if s, ok := t.consumeIdent(); ok {
+		return node.NewIdentNode(int(s[0] - 'a' + 1)), nil
+	}
+	return nil, compileError{fmt.Sprintf("不明な識別子 %s", t.str), t.meta.line, t.meta.pos}
 }
 
 type compileError struct {
@@ -114,6 +219,7 @@ type kind int
 
 const (
 	reserved kind = iota + 1
+	ident
 	number
 	eof
 )
@@ -135,20 +241,30 @@ func (t *token) consume(op string) bool {
 }
 func (t *token) expect(op string) error {
 	if t.kind != reserved || t.str != op {
-		return compileError{fmt.Sprintf("%cではありません", op), t.meta.line, t.meta.pos}
+		return compileError{fmt.Sprintf("%sではありません", op), t.meta.line, t.meta.pos}
 	}
 	*t = *t.next
 	return nil
 }
 
-func (t *token) expectNumber() (int, error) {
+func (t *token) consumeNumber() (int, bool) {
 	if t.kind != number {
-		return 0, compileError{"数ではありません", t.meta.line, t.meta.pos}
+		return 0, false
 	}
 	val := t.value
 	*t = *t.next
-	return val, nil
+	return val, true
 }
+
+func (t *token) consumeIdent() (string, bool) {
+	if t.kind != ident {
+		return "", false
+	}
+	val := t.str
+	*t = *t.next
+	return val, true
+}
+
 
 func (t token) atEof() bool {
 	return t.kind == eof
@@ -165,7 +281,8 @@ func newNextToken(kind kind, cur *token, str string, meta meta) *token {
 }
 
 var regexNumber = regexp.MustCompile(`^[0-9]+`)
-var regexOp = regexp.MustCompile(`^(\+|-|\*|/|\(|\)|<=|<|>|>=|==|!=)`)
+var regexAlphabet = regexp.MustCompile(`^[a-z]`)
+var regexOp = regexp.MustCompile(`^(\+|-|\*|/|\(|\)|=|;|<=|<|>|>=|==|!=)`)
 
 func Tokenize(s string) (Token, error) {
 	head := token{}
@@ -181,6 +298,12 @@ func Tokenize(s string) (Token, error) {
 			op := regexOp.FindString(s[i:])
 			cur = newNextToken(reserved, cur, op, meta{s, i})
 			i += len(op)
+			continue
+		}
+		if regexAlphabet.MatchString(s[i:]) {
+			variable := regexAlphabet.FindString(s[i:])
+			cur = newNextToken(ident, cur, variable, meta{s, i})
+			i += len(variable)
 			continue
 		}
 		if regexNumber.MatchString(s[i:]) {

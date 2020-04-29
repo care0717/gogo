@@ -1,6 +1,7 @@
 package node
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -15,11 +16,14 @@ const (
 	Ne
 	Lt
 	Le
+	Assign
+	Lvar
 	Num
 )
 
 type Node interface {
 	Gen() string
+	genLval() (string, error)
 }
 
 type node struct {
@@ -27,6 +31,7 @@ type node struct {
 	lhs  Node
 	rhs  Node
 	val  int
+	offset int
 }
 
 func NewNode(kind kind, lhs Node, rhs Node) Node {
@@ -44,9 +49,31 @@ func NewNumNode(val int) Node {
 	}
 }
 
+func NewIdentNode(offset int) Node {
+	return &node{
+		kind: Lvar,
+		offset:  offset,
+	}
+}
+
 func (node *node) Gen() string {
-	if node.kind == Num {
+	switch node.kind  {
+	case Num:
 		return fmt.Sprintf("  push %d\n", node.val)
+	case Lvar:
+		res, _ := node.genLval()
+		res += fmt.Sprintln("  pop rax")
+		res += fmt.Sprintln("  mov rax, [rax]")
+		res += fmt.Sprintln("  push rax")
+		return res
+	case Assign:
+		res, _ := node.lhs.genLval()
+		res += node.rhs.Gen()
+		res += fmt.Sprintln("  pop rdi")
+		res += fmt.Sprintln("  pop rax")
+		res += fmt.Sprintln("  mov [rax], rdi")
+		res += fmt.Sprintln("  push rdi")
+		return res
 	}
 	var res string
 
@@ -84,5 +111,16 @@ func (node *node) Gen() string {
 	}
 	res += fmt.Sprintln("  push rax")
 	return res
+}
+
+func (node *node) genLval() (string, error) {
+	if node.kind != Lvar {
+		return "", errors.New("左辺が変数ではありません")
+	}
+	var res string
+	res += fmt.Sprintln("  mov rax, rbp")
+	res += fmt.Sprintf("  sub rax, %d\n", node.offset)
+	res += fmt.Sprintln("  push rax")
+	return res, nil
 }
 
