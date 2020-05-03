@@ -49,7 +49,7 @@ func NewNumNode(val int) Node {
 	}
 }
 
-func NewIdentNode(offset int) Node {
+func NewLVarNode(offset int) Node {
 	return &node{
 		kind: Lvar,
 		offset:  offset,

@@ -190,7 +190,16 @@ func (t *token) primary() (node.Node, error) {
 		return node.NewNumNode(i), nil
 	}
 	if s, ok := t.consumeIdent(); ok {
-		return node.NewIdentNode(int(s[0] - 'a' + 1)), nil
+		if lvar, ok := lVarMap[s]; ok {
+			return node.NewLVarNode(lvar.offset), nil
+		}
+		offset += 8
+		lVar := LVar{
+			name:   s,
+			offset: offset,
+		}
+		lVarMap[s] = lVar
+		return node.NewLVarNode(offset), nil
 	}
 	return nil, compileError{fmt.Sprintf("不明な識別子 %s", t.str), t.meta.line, t.meta.pos}
 }
@@ -281,8 +290,16 @@ func newNextToken(kind kind, cur *token, str string, meta meta) *token {
 }
 
 var regexNumber = regexp.MustCompile(`^[0-9]+`)
-var regexAlphabet = regexp.MustCompile(`^[a-z]`)
+var regexAlphabet = regexp.MustCompile(`^[a-zA-Z]+`)
 var regexOp = regexp.MustCompile(`^(\+|-|\*|/|\(|\)|=|;|<=|<|>|>=|==|!=)`)
+
+type LVar struct {
+	name string
+	offset int
+}
+
+var lVarMap = map[string]LVar{}
+var offset int
 
 func Tokenize(s string) (Token, error) {
 	head := token{}
