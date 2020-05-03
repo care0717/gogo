@@ -18,6 +18,7 @@ const (
 	Le
 	Assign
 	Lvar
+	Ret
 	Num
 )
 
@@ -56,8 +57,22 @@ func NewLVarNode(offset int) Node {
 	}
 }
 
+func NewReturnNode(lhs Node) Node {
+	return &node{
+		lhs: lhs,
+		kind: Ret,
+	}
+}
+
 func (node *node) Gen() string {
 	switch node.kind  {
+	case Ret:
+		res := node.lhs.Gen()
+		res += fmt.Sprintln("  pop rax")
+		res += fmt.Sprintln("  mov rsp, rbp")
+		res += fmt.Sprintln("  pop rbp")
+		res += fmt.Sprintln("  ret")
+		return res
 	case Num:
 		return fmt.Sprintf("  push %d\n", node.val)
 	case Lvar:

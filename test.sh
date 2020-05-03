@@ -49,4 +49,6 @@ assert 0 '1>=2;'
 
 assert 4 'a = 3;a + 1;'
 assert 6 'foo = 1;bar = 2 + 3;foo + bar;'
+assert 6 'foo = 1;bar = 2 + 3;return foo + bar;'
+
 echo OK

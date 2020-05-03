@@ -24,9 +24,19 @@ func (t *token) Program() ([]node.Node, error) {
 }
 
 func (t *token) stmt() (node.Node, error) {
-	n, err := t.expr()
-	if err != nil {
-		return nil, err
+	var n node.Node
+	if t.consumeReturn() {
+		tmp, err := t.expr()
+		if err != nil {
+			return nil, err
+		}
+		n = node.NewReturnNode(tmp)
+	} else {
+		tmp, err := t.expr()
+		if err != nil {
+			return nil, err
+		}
+		n = tmp
 	}
 	if err := t.expect(";"); err != nil {
 		return nil, err
@@ -34,7 +44,7 @@ func (t *token) stmt() (node.Node, error) {
 	return n, nil
 }
 
-func (t *token) expr()  (node.Node, error) {
+func (t *token) expr() (node.Node, error) {
 	return t.assign()
 }
 
@@ -43,7 +53,7 @@ func (t *token) assign()  (node.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	if t.consume("=") {
+	if t.consumeOp("=") {
 		tmp, err := t.assign()
 		if err != nil {
 			return nil, err
@@ -59,13 +69,13 @@ func (t *token) equality() (node.Node, error) {
 		return nil, err
 	}
 	for {
-		if t.consume("==") {
+		if t.consumeOp("==") {
 			tmp, err:= t.relational()
 			if err != nil {
 				return nil, err
 			}
 			n = node.NewNode(node.Eq, n, tmp)
-		} else if t.consume("!=") {
+		} else if t.consumeOp("!=") {
 			tmp, err:= t.relational()
 			if err != nil {
 				return nil, err
@@ -83,25 +93,25 @@ func (t *token) relational() (node.Node, error) {
 		return nil, err
 	}
 	for {
-		if t.consume("<") {
+		if t.consumeOp("<") {
 			tmp, err := t.add()
 			if err != nil {
 				return nil, err
 			}
 			n = node.NewNode(node.Lt, n, tmp)
-		} else if t.consume(">") {
+		} else if t.consumeOp(">") {
 			tmp, err := t.add()
 			if err != nil {
 				return nil, err
 			}
 			n = node.NewNode(node.Lt, tmp, n)
-		} else if t.consume("<=") {
+		} else if t.consumeOp("<=") {
 			tmp, err := t.add()
 			if err != nil {
 				return nil, err
 			}
 			n = node.NewNode(node.Le, n, tmp)
-		} else if t.consume(">=") {
+		} else if t.consumeOp(">=") {
 			tmp, err := t.add()
 			if err != nil {
 				return nil, err
@@ -119,13 +129,13 @@ func (t *token) add() (node.Node, error) {
 		return nil, err
 	}
 	for {
-		if t.consume("+") {
+		if t.consumeOp("+") {
 			tmp, err := t.mul()
 			if err != nil {
 				return nil, err
 			}
 			n = node.NewNode(node.Add, n, tmp)
-		} else if t.consume("-") {
+		} else if t.consumeOp("-") {
 			tmp, err := t.mul()
 			if err != nil {
 				return nil, err
@@ -143,13 +153,13 @@ func (t *token) mul() (node.Node, error) {
 		return nil, err
 	}
 	for {
-		if t.consume("*") {
+		if t.consumeOp("*") {
 			tmp, err := t.unary()
 			if err != nil {
 				return nil, err
 			}
 			n = node.NewNode(node.Mul, n, tmp)
-		} else if t.consume("/") {
+		} else if t.consumeOp("/") {
 			tmp, err := t.unary()
 			if err != nil {
 				return nil, err
@@ -162,9 +172,9 @@ func (t *token) mul() (node.Node, error) {
 }
 
 func (t *token) unary() (node.Node, error) {
-	if t.consume("+") {
+	if t.consumeOp("+") {
 		return t.unary()
-	} else if t.consume("-") {
+	} else if t.consumeOp("-") {
 		n, err := t.unary()
 		if err != nil {
 			return nil, err
@@ -175,7 +185,7 @@ func (t *token) unary() (node.Node, error) {
 }
 
 func (t *token) primary() (node.Node, error) {
-	if t.consume("(") {
+	if t.consumeOp("(") {
 		n, err := t.expr()
 		if err != nil {
 			return nil, err
@@ -230,6 +240,7 @@ const (
 	reserved kind = iota + 1
 	ident
 	number
+	ret
 	eof
 )
 
@@ -241,7 +252,7 @@ type token struct {
 	meta  meta
 }
 
-func (t *token) consume(op string) bool {
+func (t *token) consumeOp(op string) bool {
 	if t.kind != reserved || t.str != op {
 		return false
 	}
@@ -274,6 +285,14 @@ func (t *token) consumeIdent() (string, bool) {
 	return val, true
 }
 
+func (t *token) consumeReturn() bool {
+	if t.kind != ret {
+		return false
+	}
+	*t = *t.next
+	return true
+}
+
 
 func (t token) atEof() bool {
 	return t.kind == eof
@@ -290,8 +309,9 @@ func newNextToken(kind kind, cur *token, str string, meta meta) *token {
 }
 
 var regexNumber = regexp.MustCompile(`^[0-9]+`)
-var regexAlphabet = regexp.MustCompile(`^[a-zA-Z]+`)
+var regexAlphabet = regexp.MustCompile(`^[a-zA-Z_]+`)
 var regexOp = regexp.MustCompile(`^(\+|-|\*|/|\(|\)|=|;|<=|<|>|>=|==|!=)`)
+var regexReturn = regexp.MustCompile(`^return`)
 
 type LVar struct {
 	name string
@@ -309,6 +329,12 @@ func Tokenize(s string) (Token, error) {
 	for i < len(s) {
 		if s[i] == ' ' {
 			i++
+			continue
+		}
+		if regexReturn.MatchString(s[i:]) {
+			r := regexReturn.FindString(s[i:])
+			cur = newNextToken(ret, cur, r, meta{s, i})
+			i += len(r)
 			continue
 		}
 		if regexOp.MatchString(s[i:]) {

@@ -5,7 +5,7 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 BINARY_NAME=gogo
 
-gogo: *.go
+gogo: **/*.go
 	$(GOBUILD) -v
 
 test: gogo
